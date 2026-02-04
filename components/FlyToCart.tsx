@@ -20,7 +20,7 @@ export default function FlyToCart({ startPos, image, onComplete }: FlyToCartProp
   useEffect(() => {
     const cartIcon = document.querySelector('.cart-icon-target');
     const rect = cartIcon?.getBoundingClientRect();
-    const targetX = rect ? rect.left + rect.width / 2 : window.innerWidth - 50;
+    const targetX = rect ? rect.left + rect.width / 2 : (typeof window !== "undefined" ? window.innerWidth - 50 : 0);
     const targetY = rect ? rect.top + rect.height / 2 : 50;
 
     const timer = setTimeout(() => {

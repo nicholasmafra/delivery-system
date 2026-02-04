@@ -146,10 +146,14 @@ export default function AdminPage() {
       .subscribe();
 
     const onFocus = () => fetchOrdersOnly();
-    window.addEventListener('focus', onFocus);
+    if (typeof window !== "undefined") {
+      window.addEventListener('focus', onFocus);
+    }
 
     return () => {
-      window.removeEventListener('focus', onFocus);
+      if (typeof window !== "undefined") {
+        window.removeEventListener('focus', onFocus);
+      }
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

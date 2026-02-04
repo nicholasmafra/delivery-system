@@ -43,7 +43,7 @@ export default function SuccessPage() {
 
   useEffect(() => {
     // 1) tenta recuperar snapshot salvo (se usuário recarregar a página)
-    const saved = sessionStorage.getItem(STORAGE_LAST_ORDER);
+    const saved = typeof window !== "undefined" ? sessionStorage.getItem(STORAGE_LAST_ORDER) : null;
     if (saved) {
       try {
         const parsed: OrderSnapshot = JSON.parse(saved);
@@ -69,7 +69,9 @@ export default function SuccessPage() {
       };
 
       setSnapshot(next);
-      sessionStorage.setItem(STORAGE_LAST_ORDER, JSON.stringify(next));
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(STORAGE_LAST_ORDER, JSON.stringify(next));
+      }
 
       // ✅ limpa o carrinho DEPOIS de capturar
       dispatch({ type: "CLEAR_CART" });

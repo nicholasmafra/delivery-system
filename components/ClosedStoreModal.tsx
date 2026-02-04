@@ -13,7 +13,7 @@ export default function ClosedStoreModal() {
   }, []);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || typeof window === "undefined") return;
 
     closeBtnRef.current?.focus();
 

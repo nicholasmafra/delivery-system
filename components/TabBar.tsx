@@ -15,18 +15,26 @@ function focusSearch() {
 
 export default function TabBar() {
   const { showToast } = useToast();
-  const handleHome = () => window.scrollTo({ top: 0, behavior: "smooth" });
+  const handleHome = () => {
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   const handleSearch = () => {
     if (!focusSearch()) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
       setTimeout(() => focusSearch(), 220);
     }
   };
 
   const handleProfile = () => {
     // Padrão útil: portal/parceiro
-    window.location.href = "/admin/login";
+    if (typeof window !== "undefined") {
+      window.location.href = "/admin/login";
+    }
   };
 
   const handleSoon = () => {

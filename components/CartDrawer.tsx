@@ -193,7 +193,9 @@ const handleFinalizeOrder = async (userData: any) => {
     );
 
     const phone = SHOP_CONFIG?.phone || '5584988157402';
-    window.open(`https://wa.me/${phone}?text=${message}`, "_blank");
+    if (typeof window !== "undefined") {
+      window.open(`https://wa.me/${phone}?text=${message}`, "_blank");
+    }
 
     dispatch({ type: "CLEAR_CART" });
     router.push("/success");
