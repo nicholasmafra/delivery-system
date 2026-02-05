@@ -20,6 +20,7 @@ import StatusBadge from "@/components/StatusBadge";
 import TabBar from "@/components/TabBar";
 import ClosedStoreModal from "@/components/ClosedStoreModal";
 import CartSummary from "@/components/CartSummary";
+import EmptyState from "@/components/EmptyState";
 import { useCart } from "@/context/CartContext";
 
 type SortOption = "relevance" | "price_asc" | "price_desc" | "name_asc";
@@ -305,9 +306,9 @@ export default function HomeClient() {
           ) : filteredProducts.length > 0 ? (
             filteredProducts.map((p) => <ProductCard key={p.id} product={p} />)
           ) : (
-            <div className="col-span-full py-20 text-center">
+            <div className="col-span-full">
               {loadError ? (
-                <div className="space-y-4">
+                <div className="py-20 text-center space-y-4">
                   <p className="text-red-500 font-black">Erro ao carregar produtos: {loadError}</p>
                   <div className="flex items-center justify-center gap-3">
                     <button onClick={() => mutate('products')} className="px-6 py-3 bg-black text-white rounded-full font-black">Tentar novamente</button>
@@ -315,16 +316,12 @@ export default function HomeClient() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <p className="text-gray-400 font-bold italic mb-4">Nenhum item encontrado com esses filtros.</p>
-                  <button
-                    type="button"
-                    onClick={clearAllFilters}
-                    className="px-6 py-3 bg-gray-50 rounded-full border border-gray-100 text-[10px] font-black uppercase tracking-widest hover:bg-black hover:text-white transition-colors"
-                  >
-                    Limpar filtros
-                  </button>
-                </div>
+                <EmptyState
+                  hasFilters={hasActiveFilters}
+                  onClearFilters={clearAllFilters}
+                  suggestedProducts={products.slice(0, 8)}
+                  isLoading={isLoading}
+                />
               )}
             </div>
           )}
