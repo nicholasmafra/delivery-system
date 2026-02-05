@@ -19,6 +19,7 @@ import CategoryBar from "@/components/CategoryBar";
 import StatusBadge from "@/components/StatusBadge";
 import TabBar from "@/components/TabBar";
 import ClosedStoreModal from "@/components/ClosedStoreModal";
+import CartSummary from "@/components/CartSummary";
 import { useCart } from "@/context/CartContext";
 
 type SortOption = "relevance" | "price_asc" | "price_desc" | "name_asc";
@@ -348,6 +349,7 @@ export default function HomeClient() {
       )}
 
       <CartDrawer />
+      <CartSummary />
       <TabBar />
     </main>
   );
