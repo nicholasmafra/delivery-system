@@ -196,6 +196,7 @@ export default function CheckoutForm({
       subtotal: itemsTotal,
       desconto: state.discount,
       total: totalFinal,
+      applied_coupon: state.appliedCoupon || null,
     });
   };
 
