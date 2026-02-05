@@ -80,11 +80,11 @@ function ProductCardInner({ product }: { product: Product }) {
             <button
               type="button"
               onClick={handleAdd}
-              disabled={!canBuy}
+              disabled={!canBuy || !!animating}
               aria-label={canBuy ? `Adicionar ${product.name} ao carrinho` : "Indisponível"}
               className={[
                 "p-3 rounded-xl transition-all active:scale-95",
-                canBuy
+                canBuy && !animating
                   ? "bg-black text-[#FBBE01] hover:opacity-90"
                   : "bg-gray-100 text-gray-400 cursor-not-allowed",
               ].join(" ")}

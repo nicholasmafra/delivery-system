@@ -35,8 +35,19 @@
   100% { transform: translateY(0px); }
 }
 
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-0.25rem); }
+}
+
 .animate-float {
   animation: float 3s ease-in-out infinite;
+}
+
+/* Bounce animation optimized for GPU */
+.animate-bounce {
+  animation: bounce 1s infinite;
+  will-change: transform;
 }
 
 /* Scroll lateral suave */

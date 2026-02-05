@@ -23,7 +23,8 @@ export default function FlyToCart({ startPos, image, onComplete }: FlyToCartProp
     const targetX = rect ? rect.left + rect.width / 2 : (typeof window !== "undefined" ? window.innerWidth - 50 : 0);
     const targetY = rect ? rect.top + rect.height / 2 : 50;
 
-    const timer = setTimeout(() => {
+    // Trigger animation immediately with requestAnimationFrame for better performance
+    const frameId = requestAnimationFrame(() => {
       setStyle({
         left: targetX,
         top: targetY,
@@ -31,19 +32,21 @@ export default function FlyToCart({ startPos, image, onComplete }: FlyToCartProp
         scale: 0.1,
         transform: 'translate(-50%, -50%) rotate(360deg)',
       });
-    }, 50);
+    });
 
-    const endTimer = setTimeout(onComplete, 800);
-    return () => { clearTimeout(timer); clearTimeout(endTimer); };
+    // Faster animation: reduced from 800ms to 600ms
+    const endTimer = setTimeout(onComplete, 600);
+    return () => { cancelAnimationFrame(frameId); clearTimeout(endTimer); };
   }, [onComplete]);
 
   return (
     <div 
-      className="fixed z-[100] pointer-events-none transition-all duration-700 ease-in-out"
+      className="fixed z-[100] pointer-events-none transition-all duration-600 ease-out"
       style={{
         ...style,
         width: '60px',
         height: '60px',
+        willChange: 'transform, opacity',
       }}
     >
       <Image src={image} alt="" width={60} height={60} className="w-full h-full object-cover rounded-full border-2 border-[#FBBE01] shadow-2xl" unoptimized />

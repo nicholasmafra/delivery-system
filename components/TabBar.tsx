@@ -91,7 +91,7 @@ export default function TabBar() {
         <div className="relative">
           <ShoppingCart size={22} />
           {cartCount > 0 && (
-            <span className="absolute -top-2 -right-2 w-5 h-5 bg-[#FBBE01] text-black text-[10px] font-black rounded-full flex items-center justify-center animate-bounce border border-black">
+            <span className="absolute -top-2 -right-2 w-5 h-5 bg-[#FBBE01] text-black text-[10px] font-black rounded-full flex items-center justify-center border border-black animate-pulse transition-transform will-change-transform" style={{ animation: 'bounce 1s infinite' }}>
               {cartCount > 9 ? "9+" : cartCount}
             </span>
           )}
