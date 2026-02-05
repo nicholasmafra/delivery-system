@@ -26,7 +26,7 @@ interface AISuggestion extends Partial<Product> {
 }
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<'metrics' | 'products' | 'fees' | 'promotions' | 'sales' | 'categories'>('metrics');
+  const [tab, setTab] = useState<'metrics' | 'products' | 'fees' | 'promotions' | 'sales' | 'categories' | 'abc'>('metrics');
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [neighborhoods, setNeighborhoods] = useState<Neighborhood[]>([]);
@@ -516,6 +516,66 @@ export default function AdminPage() {
     return isNaN(prediction) ? currentStock : Math.max(0, prediction).toFixed(1);
   };
 
+  // Curva ABC: calcula faturamento de cada produto e classifica em A/B/C
+  const abcAnalysis = useMemo(() => {
+    const productRevenue: { id: string; name: string; quantity: number; revenue: number; stock: number }[] = [];
+
+    // Calcula faturamento por produto
+    orders.forEach((o) => {
+      (o.items || []).forEach((item: any) => {
+        const prod = products.find((p) => p.id === item.id);
+        if (prod) {
+          const existing = productRevenue.find((p) => p.id === item.id);
+          const itemRevenue = Number(item.quantity || 0) * Number(prod.price || 0);
+          if (existing) {
+            existing.quantity += Number(item.quantity || 0);
+            existing.revenue += itemRevenue;
+          } else {
+            productRevenue.push({
+              id: item.id,
+              name: prod.name,
+              quantity: Number(item.quantity || 0),
+              revenue: itemRevenue,
+              stock: prod.stock_quantity || 0,
+            });
+          }
+        }
+      });
+    });
+
+    // Ordena por faturamento (maior primeiro)
+    productRevenue.sort((a, b) => b.revenue - a.revenue);
+
+    // Calcula percentuais acumulados e classifica
+    const totalRevenue = productRevenue.reduce((acc, p) => acc + p.revenue, 0);
+    let accumulatedRevenue = 0;
+
+    const classified = productRevenue.map((p) => {
+      accumulatedRevenue += p.revenue;
+      const percentageOfTotal = (p.revenue / totalRevenue) * 100;
+      const accumulatedPercentage = (accumulatedRevenue / totalRevenue) * 100;
+
+      let classification: 'A' | 'B' | 'C' = 'C';
+      if (accumulatedPercentage <= 80) classification = 'A';
+      else if (accumulatedPercentage <= 95) classification = 'B';
+
+      return {
+        ...p,
+        percentageOfTotal,
+        accumulatedPercentage,
+        classification,
+      };
+    });
+
+    return {
+      items: classified,
+      total: totalRevenue,
+      countA: classified.filter((p) => p.classification === 'A').length,
+      countB: classified.filter((p) => p.classification === 'B').length,
+      countC: classified.filter((p) => p.classification === 'C').length,
+    };
+  }, [products, orders]);
+
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex font-sans antialiased text-slate-900">
       {/* Toasts rendered by ToastProvider */}
@@ -534,6 +594,7 @@ export default function AdminPage() {
             { id: 'fees', icon: Truck, label: 'Entregas' },
             { id: 'promotions', icon: Ticket, label: 'Promoções' },
             { id: 'sales', icon: BarChart3, label: 'Vendas' },
+            { id: 'abc', icon: TrendingUp, label: 'Curva ABC' },
           ].map((nav) => (
             <button key={nav.id} onClick={() => setTab(nav.id as any)} className={`w-full flex items-center gap-3 p-3 rounded-2xl font-bold transition-all ${tab === nav.id ? 'bg-black text-white shadow-xl translate-x-1' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'}`}>
               <nav.icon size={20} className={tab === nav.id ? 'text-[#FBBE01]' : ''} />
@@ -546,10 +607,10 @@ export default function AdminPage() {
       <main className="flex-1 p-4 lg:p-10 max-w-7xl mx-auto w-full overflow-x-hidden">
         <header className="flex justify-between items-center mb-10">
           <div>
-            <h1 className="text-4xl font-black tracking-tighter capitalize">{tab === 'fees' ? 'Entregas' : tab}</h1>
+            <h1 className="text-4xl font-black tracking-tighter capitalize">{tab === 'fees' ? 'Entregas' : tab === 'abc' ? 'Curva ABC' : tab}</h1>
             <p className="text-slate-400 text-sm font-semibold italic">Gestão Administrativa</p>
           </div>
-          {tab !== 'metrics' && tab !== 'sales' && (
+          {tab !== 'metrics' && tab !== 'sales' && tab !== 'abc' && (
             <button onClick={() => { setEditingItem(null); setFormData({ type: 'percent' }); setIsModalOpen(true); }} className="bg-black text-white px-8 py-4 rounded-3xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-[#FBBE01] hover:text-black transition-all shadow-2xl active:scale-95">
               <Plus size={18} /> <span>Novo {tab === 'products' ? 'Produto' : tab === 'fees' ? 'Bairro' : tab === 'promotions' ? 'Cupom' : tab === 'categories' ? 'Categoria' : 'Registro'}</span>
             </button>
@@ -891,6 +952,109 @@ export default function AdminPage() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {tab === 'abc' && (
+          <div className="space-y-8 animate-in fade-in">
+            {/* Cards de Resumo */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2 italic">Total de Faturamento</p>
+                <h3 className="text-3xl font-black">{formatCurrency(abcAnalysis.total)}</h3>
+              </div>
+              <div className="bg-red-50 p-8 rounded-[2.5rem] border border-red-100 shadow-sm">
+                <p className="text-red-600 text-[10px] font-black uppercase tracking-widest mb-2 italic">Classe A</p>
+                <h3 className="text-3xl font-black text-red-600">{abcAnalysis.countA}</h3>
+                <p className="text-[10px] font-bold text-red-400 mt-2">~80% do faturamento</p>
+              </div>
+              <div className="bg-yellow-50 p-8 rounded-[2.5rem] border border-yellow-100 shadow-sm">
+                <p className="text-yellow-600 text-[10px] font-black uppercase tracking-widest mb-2 italic">Classe B</p>
+                <h3 className="text-3xl font-black text-yellow-600">{abcAnalysis.countB}</h3>
+                <p className="text-[10px] font-bold text-yellow-400 mt-2">~15% do faturamento</p>
+              </div>
+              <div className="bg-green-50 p-8 rounded-[2.5rem] border border-green-100 shadow-sm">
+                <p className="text-green-600 text-[10px] font-black uppercase tracking-widest mb-2 italic">Classe C</p>
+                <h3 className="text-3xl font-black text-green-600">{abcAnalysis.countC}</h3>
+                <p className="text-[10px] font-bold text-green-400 mt-2">~5% do faturamento</p>
+              </div>
+            </div>
+
+            {/* Tabela de Curva ABC */}
+            <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden">
+              <table className="w-full text-left">
+                <thead className="bg-slate-50/30 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <tr>
+                    <th className="px-8 py-6">Produto</th>
+                    <th className="px-8 py-6 text-center">Quantidade Vendida</th>
+                    <th className="px-8 py-6 text-right">Faturamento</th>
+                    <th className="px-8 py-6 text-center">% do Total</th>
+                    <th className="px-8 py-6 text-center">% Acumulado</th>
+                    <th className="px-8 py-6 text-center">Classe</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {abcAnalysis.items.slice(0, 30).map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10">
+                            {products.find((p) => p.id === item.id) && (
+                              <img
+                                src={products.find((p) => p.id === item.id)?.image_url}
+                                alt=""
+                                className="w-full h-full rounded-lg object-cover border border-slate-100"
+                              />
+                            )}
+                          </div>
+                          <span className="font-black text-sm">{item.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6 text-center font-bold text-slate-600">{item.quantity} un</td>
+                      <td className="px-8 py-6 text-right font-black text-lg">{formatCurrency(item.revenue)}</td>
+                      <td className="px-8 py-6 text-center">
+                        <span className="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-black text-slate-600">
+                          {item.percentageOfTotal.toFixed(1)}%
+                        </span>
+                      </td>
+                      <td className="px-8 py-6 text-center font-bold text-slate-600">{item.accumulatedPercentage.toFixed(1)}%</td>
+                      <td className="px-8 py-6 text-center">
+                        <span
+                          className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                            item.classification === 'A'
+                              ? 'bg-red-100 text-red-600'
+                              : item.classification === 'B'
+                              ? 'bg-yellow-100 text-yellow-600'
+                              : 'bg-green-100 text-green-600'
+                          }`}
+                        >
+                          {item.classification}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Legenda */}
+            <div className="bg-slate-50 rounded-[2.5rem] p-8 border border-slate-100">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Legenda da Curva ABC</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <p className="font-black text-red-600 mb-2">Classe A - Produtos Estratégicos</p>
+                  <p className="text-[10px] text-slate-600 font-semibold">Representa aproximadamente 80% do faturamento. Recomenda-se manter sempre em estoque e acompanhar de perto.</p>
+                </div>
+                <div>
+                  <p className="font-black text-yellow-600 mb-2">Classe B - Produtos Intermediários</p>
+                  <p className="text-[10px] text-slate-600 font-semibold">Representa aproximadamente 15% do faturamento. Controle moderado de estoque é necessário.</p>
+                </div>
+                <div>
+                  <p className="font-black text-green-600 mb-2">Classe C - Produtos com Baixa Venda</p>
+                  <p className="text-[10px] text-slate-600 font-semibold">Representa aproximadamente 5% do faturamento. Considerar promoções ou remover do catálogo.</p>
+                </div>
+              </div>
             </div>
           </div>
         )}
