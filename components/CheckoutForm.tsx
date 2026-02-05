@@ -36,6 +36,8 @@ export default function CheckoutForm({
   const [numero, setNumero] = useState("");
   const [pagamento, setPagamento] = useState("Dinheiro");
 
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
   const [loadingCep, setLoadingCep] = useState(false);
   const [nbQuery, setNbQuery] = useState("");
   const [showNbList, setShowNbList] = useState(false);
@@ -81,6 +83,21 @@ export default function CheckoutForm({
     if (v.length > 10) v = `${v.slice(0, 10)}-${v.slice(10)}`;
     setTelefone(v);
   };
+
+  const markTouched = (field: string) => setTouched((s) => ({ ...s, [field]: true }));
+
+  const inputError = (field: string) => {
+    if (!touched[field]) return false;
+    if (field === "telefone") return telefone.replace(/\D/g, "").length < 10;
+    if (field === "nome") return !nome.trim();
+    if (field === "endereco") return !endereco.trim();
+    if (field === "numero") return !numero.trim();
+    if (field === "bairro") return !selectedNb;
+    return false;
+  };
+
+  const classFor = (field: string, base = inputBase) =>
+    `${base} ${inputError(field) ? "ring-red-500 border-red-200" : ""}`;
 
   const handleCep = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let v = e.target.value.replace(/\D/g, "");
@@ -152,7 +169,20 @@ export default function CheckoutForm({
   const canSubmit = missing.length === 0;
 
   const handleSubmit = () => {
-    if (!canSubmit) return;
+    if (!canSubmit) {
+      // mark all so errors appear
+      setTouched({ nome: true, telefone: true, endereco: true, numero: true, bairro: true });
+
+      // focus first invalid
+      if (typeof window !== "undefined") {
+        const first = document.querySelector(
+          'input[data-field][aria-invalid="true"], select[data-field][aria-invalid="true"]'
+        ) as HTMLElement | null;
+        if (first) first.focus();
+      }
+
+      return;
+    }
 
     onSubmit({
       nome,
@@ -182,10 +212,14 @@ export default function CheckoutForm({
 
         <div className="space-y-3">
           <input
+            data-field
+            id="checkout-nome"
             value={nome}
             onChange={(e) => setNome(e.target.value)}
+            onBlur={() => markTouched("nome")}
+            aria-invalid={inputError("nome")}
             placeholder="Seu nome"
-            className={inputBase}
+            className={classFor("nome", inputBase)}
           />
 
           <div className="relative">
@@ -194,10 +228,14 @@ export default function CheckoutForm({
               className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300"
             />
             <input
+              data-field
+              id="checkout-telefone"
               value={telefone}
               onChange={handlePhone}
+              onBlur={() => markTouched("telefone")}
+              aria-invalid={inputError("telefone")}
               placeholder="Telefone (WhatsApp)"
-              className={inputWithIcon}
+              className={classFor("telefone", inputWithIcon)}
             />
           </div>
         </div>
@@ -232,17 +270,25 @@ export default function CheckoutForm({
           </div>
 
           <input
+            data-field
+            id="checkout-endereco"
             value={endereco}
             onChange={(e) => setEndereco(e.target.value)}
+            onBlur={() => markTouched("endereco")}
+            aria-invalid={inputError("endereco")}
             placeholder="Rua / Avenida"
-            className={inputBase}
+            className={classFor("endereco", inputBase)}
           />
 
           <input
+            data-field
+            id="checkout-numero"
             value={numero}
             onChange={(e) => setNumero(e.target.value)}
+            onBlur={() => markTouched("numero")}
+            aria-invalid={inputError("numero")}
             placeholder="Número"
-            className={inputBase}
+            className={classFor("numero", inputBase)}
           />
 
           {/* Bairro */}
@@ -293,6 +339,8 @@ export default function CheckoutForm({
             ) : (
               <div className="relative">
                 <input
+                  data-field
+                  id="checkout-bairro"
                   value={nbQuery}
                   onChange={(e) => {
                     setNbQuery(e.target.value);
@@ -301,6 +349,8 @@ export default function CheckoutForm({
                     setCepNbNotFound(false);
                   }}
                   onFocus={() => setShowNbList(true)}
+                  onBlur={() => markTouched("bairro")}
+                  aria-invalid={inputError("bairro")}
                   placeholder="Digite para buscar bairro"
                   className={
                     "w-full px-5 py-4 bg-white rounded-3xl font-bold text-sm outline-none " +

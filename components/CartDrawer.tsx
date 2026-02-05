@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/ToastProvider";
 import { getSmartSuggestions, formatCurrency, isStoreOpen } from "@/lib/utils";
@@ -20,6 +20,55 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { SHOP_CONFIG } from "@/lib/config";
 
+type CartItemProps = {
+  item: any;
+  onRemove: () => void;
+  onAdd: () => void;
+  disabled?: boolean;
+};
+
+const CartItemRow = React.memo(function CartItemRow({ item, onRemove, onAdd, disabled }: CartItemProps) {
+  return (
+    <div className="bg-gray-50 p-4 rounded-[2rem] border border-gray-100 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-3 min-w-0">
+        <img
+          src={item.image_url}
+          alt=""
+          className="w-12 h-12 rounded-2xl object-cover border border-gray-100"
+        />
+        <div className="min-w-0">
+          <p className="font-black text-black truncate">{item.name}</p>
+          <p className="text-sm font-bold text-gray-400">{formatCurrency(item.price)}</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onRemove}
+          className="p-2 rounded-2xl bg-white hover:bg-gray-100 active:scale-95 transition-transform"
+          aria-label={`Diminuir ${item.name}`}
+          disabled={disabled}
+        >
+          <Minus size={16} />
+        </button>
+
+        <span className="w-6 text-center font-black">{item.quantity}</span>
+
+        <button
+          type="button"
+          onClick={onAdd}
+          className="p-2 rounded-2xl bg-white hover:bg-gray-100 active:scale-95 transition-transform"
+          aria-label={`Aumentar ${item.name}`}
+          disabled={disabled}
+        >
+          <Plus size={16} />
+        </button>
+      </div>
+    </div>
+  );
+});
+
 export default function CartDrawer() {
   const { state, dispatch } = useCart();
   const router = useRouter();
@@ -34,6 +83,14 @@ export default function CartDrawer() {
   const [loadingCoupon, setLoadingCoupon] = useState(false);
 
   const storeOpen = isStoreOpen();
+
+  const onRemoveOne = useCallback((id: string) => {
+    dispatch({ type: "REMOVE_ONE", payload: id });
+  }, [dispatch]);
+
+  const onAddOne = useCallback((product: any) => {
+    dispatch({ type: "ADD_ITEM", payload: product });
+  }, [dispatch]);
 
   useEffect(() => {
     const loadProductsForSuggestions = async () => {
@@ -261,48 +318,13 @@ const handleFinalizeOrder = async (userData: any) => {
         ) : (
           <div className="space-y-3">
             {state.items.map((item) => (
-              <div
+              <CartItemRow
                 key={item.id}
-                className="bg-gray-50 p-4 rounded-[2rem] border border-gray-100 flex items-center justify-between gap-3"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <img
-                    src={item.image_url}
-                    alt=""
-                    className="w-12 h-12 rounded-2xl object-cover border border-gray-100"
-                  />
-                  <div className="min-w-0">
-                    <p className="font-black text-black truncate">{item.name}</p>
-                    <p className="text-sm font-bold text-gray-400">{formatCurrency(item.price)}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    // ✅ ação real do contexto
-                    onClick={() => dispatch({ type: "REMOVE_ONE", payload: item.id })}
-                    className="p-2 rounded-2xl bg-white hover:bg-gray-100 active:scale-95 transition-transform"
-                    aria-label={`Diminuir ${item.name}`}
-                    disabled={!storeOpen}
-                  >
-                    <Minus size={16} />
-                  </button>
-
-                  <span className="w-6 text-center font-black">{item.quantity}</span>
-
-                  <button
-                    type="button"
-                    // ✅ ação real do contexto (ADD_ITEM recebe Product)
-                    onClick={() => dispatch({ type: "ADD_ITEM", payload: item })}
-                    className="p-2 rounded-2xl bg-white hover:bg-gray-100 active:scale-95 transition-transform"
-                    aria-label={`Aumentar ${item.name}`}
-                    disabled={!storeOpen}
-                  >
-                    <Plus size={16} />
-                  </button>
-                </div>
-              </div>
+                item={item}
+                onRemove={() => onRemoveOne(item.id)}
+                onAdd={() => onAddOne(item)}
+                disabled={!storeOpen}
+              />
             ))}
           </div>
         )}

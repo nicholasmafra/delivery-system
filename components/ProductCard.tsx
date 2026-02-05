@@ -1,4 +1,5 @@
 "use client";
+
 import Image from "next/image";
 import { Product } from "@/lib/types";
 import { useCart } from "@/context/CartContext";
@@ -6,9 +7,12 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import FlyToCart from "./FlyToCart";
 import { isStoreOpen } from "@/lib/utils";
+import { useToast } from "@/components/ToastProvider";
+import React from "react";
 
-export default function ProductCard({ product }: { product: Product }) {
+function ProductCardInner({ product }: { product: Product }) {
   const { dispatch } = useCart();
+  const { showToast } = useToast();
   const [animating, setAnimating] = useState<{ x: number; y: number } | null>(null);
 
   const storeOpen = isStoreOpen();
@@ -20,6 +24,7 @@ export default function ProductCard({ product }: { product: Product }) {
 
     setAnimating({ x: e.clientX, y: e.clientY });
     dispatch({ type: "ADD_ITEM", payload: product });
+    showToast(`${product.name} adicionado ao carrinho`);
   };
 
   return (
@@ -98,3 +103,5 @@ export default function ProductCard({ product }: { product: Product }) {
     </>
   );
 }
+
+export default React.memo(ProductCardInner);
