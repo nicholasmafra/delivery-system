@@ -131,6 +131,15 @@ export default function HomeClient() {
     setHideOutOfStock(false);
   };
 
+  const handleVerOfertas = () => {
+    if (typeof window !== "undefined") {
+      const section = document.getElementById("products-section");
+      if (section) {
+        section.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  };
+
   const hasActiveFilters =
     (activeCategory && activeCategory !== "Todos") ||
     !!searchTerm.trim() ||
@@ -281,13 +290,13 @@ export default function HomeClient() {
         </div>
       )}
 
-      <HeroSection />
+      <HeroSection onVerOfertas={handleVerOfertas} />
 
       <section className="max-w-7xl mx-auto px-6 mt-6">
         <CategoryBar activeCategory={activeCategory} onCategoryChange={setActiveCategory} />
       </section>
 
-      <section className="px-6 mt-8 max-w-7xl mx-auto pb-40">
+      <section id="products-section" className="px-6 mt-8 max-w-7xl mx-auto pb-40">
         <div className="flex items-center justify-between gap-2 mb-6">
           <div className="flex items-center gap-2">
             <Package size={16} className="text-[#FBBE01]" />

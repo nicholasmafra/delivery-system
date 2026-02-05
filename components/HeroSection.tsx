@@ -3,7 +3,11 @@
 import React from "react";
 import { Zap, Gift } from "lucide-react";
 
-export default function HeroSection() {
+interface HeroSectionProps {
+  onVerOfertas?: () => void;
+}
+
+export default function HeroSection({ onVerOfertas }: HeroSectionProps) {
   return (
     <section className="bg-gradient-to-r from-black via-[#0a0a0a] to-black text-white px-6 py-8 relative overflow-hidden">
       {/* Efeito de fundo */}
@@ -34,6 +38,7 @@ export default function HeroSection() {
             <div className="pt-2">
               <button
                 type="button"
+                onClick={onVerOfertas}
                 className="px-6 py-3 bg-[#FBBE01] text-black font-black uppercase tracking-widest rounded-full hover:bg-white transition-colors active:scale-95"
               >
                 Ver ofertas
