@@ -1,6 +1,7 @@
 "use client";
-import { Home, Search, User, Heart } from "lucide-react";
+import { Home, Search, User, Heart, ShoppingCart } from "lucide-react";
 import { useToast } from '@/components/ToastProvider';
+import { useCart } from '@/context/CartContext';
 
 function focusSearch() {
   const el = document.getElementById("search-input") as HTMLInputElement | null;
@@ -15,6 +16,10 @@ function focusSearch() {
 
 export default function TabBar() {
   const { showToast } = useToast();
+  const { state, dispatch } = useCart();
+
+  const cartCount = state.items.reduce((acc, item) => acc + item.quantity, 0);
+
   const handleHome = () => {
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -39,6 +44,10 @@ export default function TabBar() {
 
   const handleSoon = () => {
     showToast('Em breve 🙂');
+  };
+
+  const handleCart = () => {
+    dispatch({ type: "TOGGLE_CART" });
   };
 
   return (
@@ -71,6 +80,23 @@ export default function TabBar() {
       >
         <Heart size={22} />
         <span className="text-[8px] font-black uppercase tracking-tighter">Favoritos</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={handleCart}
+        aria-label={`Carrinho com ${cartCount} itens`}
+        className="flex flex-col items-center gap-1 relative text-white/80 hover:text-[#FBBE01] transition-transform active:scale-90"
+      >
+        <div className="relative">
+          <ShoppingCart size={22} />
+          {cartCount > 0 && (
+            <span className="absolute -top-2 -right-2 w-5 h-5 bg-[#FBBE01] text-black text-[10px] font-black rounded-full flex items-center justify-center animate-bounce border border-black">
+              {cartCount > 9 ? "9+" : cartCount}
+            </span>
+          )}
+        </div>
+        <span className="text-[8px] font-black uppercase tracking-tighter">Carrinho</span>
       </button>
 
       <button

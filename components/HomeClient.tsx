@@ -21,6 +21,7 @@ import TabBar from "@/components/TabBar";
 import ClosedStoreModal from "@/components/ClosedStoreModal";
 import CartSummary from "@/components/CartSummary";
 import EmptyState from "@/components/EmptyState";
+import HeroSection from "@/components/HeroSection";
 import { useCart } from "@/context/CartContext";
 
 type SortOption = "relevance" | "price_asc" | "price_desc" | "name_asc";
@@ -279,6 +280,8 @@ export default function HomeClient() {
           </span>
         </div>
       )}
+
+      <HeroSection />
 
       <section className="max-w-7xl mx-auto px-6 mt-6">
         <CategoryBar activeCategory={activeCategory} onCategoryChange={setActiveCategory} />
