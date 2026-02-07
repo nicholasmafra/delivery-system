@@ -867,7 +867,7 @@ export default function AdminPage() {
 
         {confirmBulkDelete && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
-            <div className="bg-white w-full max-w-sm rounded-[3rem] p-10 text-center space-y-6 shadow-2xl">
+            <div className={`w-full max-w-sm rounded-[3rem] p-10 text-center space-y-6 shadow-2xl ${ darkMode ? 'bg-slate-800' : 'bg-white'}`}>
               <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto"><AlertTriangle size={32} /></div>
               <div>
                 <h3 className="text-xl font-black uppercase tracking-tighter">Excluir produtos selecionados?</h3>
@@ -891,18 +891,18 @@ export default function AdminPage() {
                   value={salesSearch}
                   onChange={(e) => setSalesSearch(e.target.value)}
                   placeholder="Buscar por cliente, pagamento, cupom..."
-                  className="w-full pl-16 p-5 bg-slate-50 rounded-[2rem] border-none text-sm font-bold outline-none focus:ring-2 ring-black transition-all"
+                  className={`w-full pl-16 p-5 rounded-[2rem] border-none text-sm font-bold outline-none focus:ring-2 ring-black transition-all ${ darkMode ? 'bg-slate-700 text-white placeholder-slate-400' : 'bg-slate-50'}`}
                 />
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block">De</label>
-                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full p-3 bg-slate-50 rounded-2xl border-none font-black text-xs outline-none focus:ring-2 ring-black" />
+                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={`w-full p-3 rounded-2xl border-none font-black text-xs outline-none focus:ring-2 ring-black ${ darkMode ? 'bg-slate-700 text-white' : 'bg-slate-50'}`} />
                 </div>
                 <div>
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Até</label>
-                  <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-full p-3 bg-slate-50 rounded-2xl border-none font-black text-xs outline-none focus:ring-2 ring-black" />
+                  <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={`w-full p-3 rounded-2xl border-none font-black text-xs outline-none focus:ring-2 ring-black ${ darkMode ? 'bg-slate-700 text-white' : 'bg-slate-50'}`} />
                 </div>
 
                 <div>
@@ -947,7 +947,7 @@ export default function AdminPage() {
                   <th className="px-8 py-6 text-right">Valor Total</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className={`divide-y ${ darkMode ? 'divide-slate-700' : 'divide-slate-50'}`}>
                 {salesLoading ? (
                   Array.from({ length: SALES_PAGE_SIZE }).map((_, i) => (
                     <tr key={i} className="animate-pulse">
@@ -961,10 +961,10 @@ export default function AdminPage() {
                   paginatedSales.map((o) => (
                     <tr
                       key={o.id}
-                      className="hover:bg-slate-50/50 transition-all cursor-pointer group"
+                      className={`transition-all cursor-pointer group ${ darkMode ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50/50'}`}
                       onClick={() => setViewingOrder(o)}
                     >
-                      <td className="px-8 py-6 text-xs font-bold text-slate-600">
+                      <td className={`px-8 py-6 text-xs font-bold ${ darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                         {new Date(o.created_at).toLocaleDateString('pt-BR')}
                       </td>
                       <td className="px-8 py-6 text-xs font-black uppercase tracking-tighter flex items-center gap-2">
@@ -1206,16 +1206,16 @@ export default function AdminPage() {
             {/* Cards de Resumo */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
-                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2 italic">Total de Faturamento</p>
+                <p className={`text-[10px] font-black uppercase tracking-widest mb-2 italic ${ darkMode ? 'text-slate-400' : 'text-slate-400'}`}>Total de Faturamento</p>
                 <h3 className="text-3xl font-black">{formatCurrency(abcAnalysis.total)}</h3>
               </div>
               <div className="bg-green-50 p-8 rounded-[2.5rem] border border-green-100 shadow-sm">
-                <p className="text-green-600 text-[10px] font-black uppercase tracking-widest mb-2 italic">Classe A</p>
+                <p className={`text-[10px] font-black uppercase tracking-widest mb-2 italic ${ darkMode ? 'text-green-400' : 'text-green-600'}`}>Classe A</p>
                 <h3 className="text-3xl font-black text-green-600">{abcAnalysis.countA}</h3>
                 <p className="text-[10px] font-bold text-green-400 mt-2">~80% do faturamento</p>
               </div>
               <div className="bg-yellow-50 p-8 rounded-[2.5rem] border border-yellow-100 shadow-sm">
-                <p className="text-yellow-600 text-[10px] font-black uppercase tracking-widest mb-2 italic">Classe B</p>
+                <p className={`text-[10px] font-black uppercase tracking-widest mb-2 italic ${ darkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>Classe B</p>
                 <h3 className="text-3xl font-black text-yellow-600">{abcAnalysis.countB}</h3>
                 <p className="text-[10px] font-bold text-yellow-400 mt-2">~15% do faturamento</p>
               </div>
