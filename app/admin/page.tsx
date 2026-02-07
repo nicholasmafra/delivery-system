@@ -50,6 +50,8 @@ export default function AdminPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [viewingOrder, setViewingOrder] = useState<any>(null);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
   const [orderStatusUpdating, setOrderStatusUpdating] = useState(false);
   const [selectedOrderStatus, setSelectedOrderStatus] = useState<string | null>(null);
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
@@ -305,7 +307,21 @@ export default function AdminPage() {
   // keep selectedOrderStatus in sync when modal opens
   useEffect(() => {
     setSelectedOrderStatus(viewingOrder?.status ?? null);
+    // fetch audit logs for this order when modal opens
+    if (viewingOrder?.id) fetchAuditLogs(viewingOrder.id);
   }, [viewingOrder]);
+
+  const fetchAuditLogs = async (orderId: string) => {
+    try {
+      setAuditLoading(true);
+      const { data, error } = await supabase.from('admin_audit').select('*').eq('table', 'orders').eq('record_id', orderId).order('created_at', { ascending: false }).limit(50);
+      if (!error && data) setAuditLogs(data);
+    } catch (e) {
+      // ignore
+    } finally {
+      setAuditLoading(false);
+    }
+  };
 
   const scrollSuggestions = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
@@ -1219,6 +1235,27 @@ export default function AdminPage() {
                     <p className="font-black text-sm italic">{formatCurrency(item.price * item.quantity)}</p>
                   </div>
                 ))}
+              </div>
+              {/* Audit history for this order */}
+              <div className="mt-4">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Histórico de Auditoria</p>
+                <div className="bg-white rounded-2xl border p-4 max-h-40 overflow-y-auto no-scrollbar text-sm">
+                  {auditLoading ? (
+                    <div className="text-slate-400">Carregando...</div>
+                  ) : auditLogs.length === 0 ? (
+                    <div className="text-slate-400">Nenhuma entrada de auditoria encontrada.</div>
+                  ) : (
+                    auditLogs.map((a: any) => (
+                      <div key={a.id} className="py-2 border-b last:border-b-0">
+                        <div className="flex justify-between items-center">
+                          <div className="text-xs font-black text-slate-600 uppercase">{a.action}</div>
+                          <div className="text-[10px] text-slate-400">{new Date(a.created_at).toLocaleString()}</div>
+                        </div>
+                        {a.meta && <div className="text-xs text-slate-500 mt-1 italic">{typeof a.meta === 'string' ? a.meta : JSON.stringify(a.meta)}</div>}
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
               <div className="bg-black text-white p-8 rounded-[2.5rem] shadow-xl space-y-3">
                 <div className="flex justify-between text-[10px] font-black uppercase text-slate-400 tracking-widest"><span>Subtotal</span><span>{formatCurrency(viewingOrder.subtotal)}</span></div>
