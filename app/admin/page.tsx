@@ -45,6 +45,12 @@ export default function AdminPage() {
   const [paginatedSales, setPaginatedSales] = useState<any[]>([]);
   const [salesCount, setSalesCount] = useState(0);
   const [salesLoading, setSalesLoading] = useState(false);
+  const [dateFrom, setDateFrom] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [dateTo, setDateTo] = useState<string>(new Date().toISOString().split('T')[0]);
 
   // Estados de Modais
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -373,7 +379,7 @@ export default function AdminPage() {
     // reset página quando filtros mudarem
     setSalesPage(1);
     fetchOrdersPage(1);
-  }, [debouncedSalesSearch, salesPaymentFilter, salesStatusFilter]);
+  }, [debouncedSalesSearch, salesPaymentFilter, salesStatusFilter, dateFrom, dateTo]);
 
   const salesPageItems = useMemo(() => {
     return paginatedSales;
@@ -403,6 +409,10 @@ export default function AdminPage() {
       if (salesStatusFilter && salesStatusFilter !== 'all') {
         query = query.eq('status', salesStatusFilter);
       }
+
+      // date range filter
+      if (dateFrom) query = query.gte('created_at', `${dateFrom}T00:00:00`);
+      if (dateTo) query = query.lte('created_at', `${dateTo}T23:59:59`);
 
       // search across some fields using or
       if (q) {
@@ -642,20 +652,37 @@ export default function AdminPage() {
 
   // Top Customers: calcula faturamento e pedidos por cliente
   const topCustomers = useMemo(() => {
-    const customerMap: Record<string, { name: string; total: number; count: number }> = {};
+    const customerMap: Record<string, { name: string; total: number; count: number; lastOrderDate: string; neighborhood: string }> = {};
 
     orders.forEach((o) => {
       const key = String(o.customer_name || 'Unknown');
       if (!customerMap[key]) {
-        customerMap[key] = { name: key, total: 0, count: 0 };
+        customerMap[key] = { name: key, total: 0, count: 0, lastOrderDate: o.created_at, neighborhood: o.neighborhood_name || '-' };
       }
       customerMap[key].total += Number(o.total_amount || 0);
       customerMap[key].count += 1;
+      // update last order date if this one is newer
+      if (new Date(o.created_at) > new Date(customerMap[key].lastOrderDate)) {
+        customerMap[key].lastOrderDate = o.created_at;
+        customerMap[key].neighborhood = o.neighborhood_name || '-';
+      }
     });
 
     return Object.values(customerMap)
       .sort((a, b) => b.total - a.total)
       .slice(0, 50);
+  }, [orders]);
+
+  // Order Status Summary
+  const orderStatusSummary = useMemo(() => {
+    const summary = {
+      pending: orders.filter(o => o.status === 'pending').length,
+      preparing: orders.filter(o => o.status === 'preparing').length,
+      out_for_delivery: orders.filter(o => o.status === 'out_for_delivery').length,
+      delivered: orders.filter(o => o.status === 'delivered').length,
+      cancelled: orders.filter(o => o.status === 'cancelled').length,
+    };
+    return summary;
   }, [orders]);
 
   return (
@@ -708,16 +735,31 @@ export default function AdminPage() {
         {/* ABAS */}
         {tab === 'metrics' && (
           <div className="space-y-8 animate-in fade-in">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
                 <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4 italic">Faturamento (30d)</p>
-                <h3 className="text-4xl font-black">{formatCurrency(orders.reduce((acc, o) => acc + Number(o.total_amount), 0))}</h3>
+                <h3 className="text-3xl font-black">{formatCurrency(orders.reduce((acc, o) => acc + Number(o.total_amount), 0))}</h3>
+              </div>
+              <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4 italic">Pedidos Pendentes</p>
+                <h3 className="text-4xl font-black text-slate-600">{orderStatusSummary.pending}</h3>
+                <p className="text-[9px] text-slate-400 mt-2">Aguardando preparação</p>
+              </div>
+              <div className="bg-amber-50 p-8 rounded-[2.5rem] border border-amber-100 shadow-sm">
+                <p className="text-amber-600 text-[10px] font-black uppercase tracking-widest mb-4 italic">A Entregar</p>
+                <h3 className="text-4xl font-black text-amber-600">{orderStatusSummary.out_for_delivery}</h3>
+                <p className="text-[9px] text-amber-500 mt-2">Saído para entrega</p>
+              </div>
+              <div className="bg-green-50 p-8 rounded-[2.5rem] border border-green-100 shadow-sm">
+                <p className="text-green-600 text-[10px] font-black uppercase tracking-widest mb-4 italic">Entregues</p>
+                <h3 className="text-4xl font-black text-green-600">{orderStatusSummary.delivered}</h3>
+                <p className="text-[9px] text-green-500 mt-2">Concluído</p>
               </div>
               <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
-                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4 italic text-right">Previsão Inteligente</p>
-                <div className="flex items-center gap-4 justify-end">
-                  <input type="number" value={forecastDays} onChange={(e) => setForecastDays(Number(e.target.value))} className="w-16 p-2 bg-slate-50 rounded-xl border-none font-black text-center" />
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Dias</span>
+                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4 italic">Previsão</p>
+                <div className="flex items-center gap-2">
+                  <input type="number" value={forecastDays} onChange={(e) => setForecastDays(Number(e.target.value))} className="w-12 p-2 bg-slate-50 rounded-xl border-none font-black text-center text-xl" />
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">dias</span>
                 </div>
               </div>
             </div>
@@ -772,7 +814,7 @@ export default function AdminPage() {
         {tab === 'sales' && (
           <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden animate-in fade-in">
             {/* Filtros */}
-            <div className="p-8 border-b flex flex-col lg:flex-row lg:items-center gap-4">
+            <div className="p-8 border-b space-y-4">
               <div className="relative flex-1 group">
                 <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#FBBE01] transition-colors" size={20} />
                 <input
@@ -783,26 +825,36 @@ export default function AdminPage() {
                 />
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-slate-400 font-black text-[10px] uppercase tracking-widest">
-                  <Filter size={16} /> Pagamento
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div>
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block">De</label>
+                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full p-3 bg-slate-50 rounded-2xl border-none font-black text-xs outline-none focus:ring-2 ring-black" />
                 </div>
-                <select
-                  value={salesPaymentFilter}
-                  onChange={(e) => setSalesPaymentFilter(e.target.value as any)}
-                  className="p-4 bg-slate-50 rounded-[1.5rem] border-none font-black text-xs outline-none"
-                >
-                  <option value="all">Todos</option>
-                  <option value="pix">Pix</option>
-                  <option value="card">Cartão</option>
-                  <option value="cash">Dinheiro</option>
-                </select>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 text-slate-400 font-black text-[10px] uppercase tracking-widest">Status</div>
+                <div>
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Até</label>
+                  <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-full p-3 bg-slate-50 rounded-2xl border-none font-black text-xs outline-none focus:ring-2 ring-black" />
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Pagamento</label>
+                  <select
+                    value={salesPaymentFilter}
+                    onChange={(e) => setSalesPaymentFilter(e.target.value as any)}
+                    className="w-full p-3 bg-slate-50 rounded-2xl border-none font-black text-xs outline-none focus:ring-2 ring-black"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="pix">Pix</option>
+                    <option value="card">Cartão</option>
+                    <option value="cash">Dinheiro</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Status</label>
                   <select
                     value={salesStatusFilter}
                     onChange={(e) => setSalesStatusFilter(e.target.value as any)}
-                    className="p-4 bg-slate-50 rounded-[1.5rem] border-none font-black text-xs outline-none"
+                    className="w-full p-3 bg-slate-50 rounded-2xl border-none font-black text-xs outline-none focus:ring-2 ring-black"
                   >
                     <option value="all">Todos</option>
                     <option value="pending">Pendente</option>
@@ -811,8 +863,9 @@ export default function AdminPage() {
                     <option value="cancelled">Cancelado</option>
                   </select>
                 </div>
-                <button onClick={exportSalesCSV} className="ml-2 p-3 bg-slate-50 rounded-xl text-slate-600 text-xs font-black hover:bg-slate-100">Exportar CSV</button>
               </div>
+
+              <button onClick={exportSalesCSV} className="w-full md:w-auto px-6 py-3 bg-black text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-[#FBBE01] hover:text-black transition-all">📊 Exportar CSV</button>
             </div>
 
             <table className="w-full text-left">
@@ -1190,9 +1243,11 @@ export default function AdminPage() {
                         <span className="inline-flex items-center justify-center w-8 h-8 bg-black text-white text-xs font-black rounded-full">{idx + 1}</span>
                       </td>
                       <td className="px-8 py-6 font-black text-sm">{customer.name}</td>
+                      <td className="px-8 py-6 text-sm"><span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[9px] font-black">{customer.neighborhood}</span></td>
                       <td className="px-8 py-6 text-center">
                         <span className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black">{customer.count}</span>
                       </td>
+                      <td className="px-8 py-6 text-sm text-slate-500">{new Date(customer.lastOrderDate).toLocaleDateString('pt-BR')}</td>
                       <td className="px-8 py-6 text-right font-black text-lg text-[#FBBE01]">{formatCurrency(customer.total)}</td>
                     </tr>
                   ))}
