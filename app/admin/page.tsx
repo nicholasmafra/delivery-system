@@ -14,7 +14,8 @@ import {
   LayoutDashboard, Package, Truck, Trash2, TrendingUp,
   Ticket, Plus, Search, BarChart3, Edit3, Calendar,
   Zap, X, MapPin, ChevronLeft, ChevronRight, LogOut,
-  ShoppingBag, Clock, User, CreditCard, AlertTriangle, Filter
+  ShoppingBag, Clock, User, CreditCard, AlertTriangle, Filter,
+  Moon, Sun
 } from 'lucide-react';
 
 interface AISuggestion extends Partial<Product> {
@@ -78,6 +79,10 @@ export default function AdminPage() {
   // Bulk selection for products
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  
+  // Dark mode & Notifications
+  const [darkMode, setDarkMode] = useState(false);
+  const [lastViewedOrderCount, setLastViewedOrderCount] = useState(0);
 
   
 
@@ -685,12 +690,38 @@ export default function AdminPage() {
     return summary;
   }, [orders]);
 
+  // Critical Stock Alerts
+  const criticalStockAlerts = useMemo(() => {
+    return products
+      .filter(p => p.stock_quantity <= p.min_stock)
+      .sort((a, b) => a.stock_quantity - b.stock_quantity)
+      .slice(0, 3);
+  }, [products]);
+
+  // Coupon Performance: calculates conversion % for each coupon
+  const couponPerformance = useMemo(() => {
+    return coupons.map(c => {
+      const usages = orders.filter(o => o.applied_coupon === c.code).length;
+      const isExpired = c.end_date && new Date(c.end_date) < new Date();
+      return { ...c, usages, isActive: c.is_active && !isExpired };
+    }).sort((a, b) => b.usages - a.usages);
+  }, [coupons, orders]);
+
+  const bestCoupon = useMemo(() => {
+    return couponPerformance[0] || null;
+  }, [couponPerformance]);
+
+  // Real-time notifications: new orders since last check
+  const newOrdersCount = useMemo(() => {
+    return Math.max(0, orders.length - lastViewedOrderCount);
+  }, [orders, lastViewedOrderCount]);
+
   return (
-    <div className="min-h-screen bg-[#F9FAFB] flex font-sans antialiased text-slate-900">
+    <div className={`min-h-screen flex font-sans antialiased transition-colors ${darkMode ? 'bg-slate-900 text-white' : 'bg-[#F9FAFB] text-slate-900'}`}>
       {/* Toasts rendered by ToastProvider */}
 
       {/* Sidebar */}
-      <aside className="w-20 lg:w-64 bg-white border-r border-slate-200 flex flex-col p-4 lg:p-6 sticky h-screen top-0 z-50 transition-all">
+      <aside className={`w-20 lg:w-64 border-r flex flex-col p-4 lg:p-6 sticky h-screen top-0 z-50 transition-all ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
         <div className="flex items-center gap-3 px-2 mb-10">
           <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center text-[#FBBE01] shrink-0 shadow-lg"><Package size={20} /></div>
           <span className="font-black text-xl tracking-tighter italic hidden lg:block uppercase text-black">Help Gela</span>
@@ -717,8 +748,8 @@ export default function AdminPage() {
       <main className="flex-1 p-4 lg:p-10 max-w-7xl mx-auto w-full overflow-x-hidden">
         <header className="flex justify-between items-center mb-10">
           <div>
-            <h1 className="text-4xl font-black tracking-tighter capitalize">{tab === 'fees' ? 'Entregas' : tab === 'abc' ? 'Curva ABC' : tab === 'customers' ? 'Top Clientes' : tab}</h1>
-            <p className="text-slate-400 text-sm font-semibold italic">Gestão Administrativa</p>
+            <h1 className={`text-4xl font-black tracking-tighter capitalize ${ darkMode ? 'text-white' : 'text-slate-900'}`}>{tab === 'fees' ? 'Entregas' : tab === 'abc' ? 'Curva ABC' : tab === 'customers' ? 'Top Clientes' : tab}</h1>
+            <p className={`text-sm font-semibold italic ${ darkMode ? 'text-slate-400' : 'text-slate-400'}`}>Gestão Administrativa</p>
           </div>
           {tab !== 'metrics' && tab !== 'sales' && tab !== 'abc' && tab !== 'customers' && (
             <button onClick={() => { setEditingItem(null); setFormData({ type: 'percent' }); setIsModalOpen(true); }} className="bg-black text-white px-8 py-4 rounded-3xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-[#FBBE01] hover:text-black transition-all shadow-2xl active:scale-95">
@@ -726,7 +757,14 @@ export default function AdminPage() {
             </button>
           )}
           <div className="flex items-center gap-3">
-            <button onClick={async () => { startLoading(); await supabase.auth.signOut(); stopLoading(); showToast('Desconectado'); router.push('/'); }} className="p-3 bg-slate-50 rounded-2xl text-sm font-black hover:bg-slate-100 transition-all flex items-center gap-2">
+            <button onClick={() => setDarkMode(!darkMode)} className={`p-3 rounded-2xl text-sm font-black transition-all flex items-center gap-2 ${ darkMode ? 'bg-slate-700 hover:bg-slate-600 text-yellow-300' : 'bg-slate-50 hover:bg-slate-100'}`}>
+              {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+            <button onClick={() => setLastViewedOrderCount(orders.length)} className={`relative p-3 rounded-2xl text-sm font-black transition-all flex items-center gap-2 ${ darkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-50 hover:bg-slate-100'}`}>
+              <BarChart3 size={16} />
+              {newOrdersCount > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center">{newOrdersCount}</span>}
+            </button>
+            <button onClick={async () => { startLoading(); await supabase.auth.signOut(); stopLoading(); showToast('Desconectado'); router.push('/'); }} className={`p-3 rounded-2xl text-sm font-black transition-all flex items-center gap-2 ${ darkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-50 hover:bg-slate-100'}`}>
               <LogOut size={16} /> <span className="hidden lg:inline">Sair</span>
             </button>
           </div>
@@ -792,6 +830,38 @@ export default function AdminPage() {
                 </tbody>
               </table>
             </div>
+
+            {criticalStockAlerts.length > 0 && (
+              <div className="bg-gradient-to-r from-red-50 to-rose-50 rounded-[3rem] border border-red-200 shadow-md p-8 mt-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <AlertTriangle className="text-red-600" size={24} />
+                  <h3 className="font-black text-lg text-red-700 uppercase tracking-tight">Alerta de Estoque Crítico</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {criticalStockAlerts.map(product => {
+                    const forecasted = getForecast(product.stock_quantity, product.id);
+                    return (
+                      <div key={product.id} className="bg-white rounded-2xl p-6 border-l-4 border-red-500 shadow-sm">
+                        <p className="text-red-600 font-black text-sm mb-2 uppercase tracking-wider">{product.name}</p>
+                        <div className="flex justify-between items-end">
+                          <div>
+                            <p className="text-slate-400 text-[10px] font-bold uppercase">Estoque atual</p>
+                            <p className="text-2xl font-black text-red-600">{product.stock_quantity}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-slate-400 text-[10px] font-bold uppercase">Mínimo</p>
+                            <p className="text-lg font-bold text-slate-500">{product.min_stock}</p>
+                          </div>
+                        </div>
+                        <div className="mt-4 pt-4 border-t border-slate-100">
+                          <p className="text-[10px] text-red-600 font-black italic">⚠️ Repor imediatamente</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -812,9 +882,9 @@ export default function AdminPage() {
         )}
 
         {tab === 'sales' && (
-          <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden animate-in fade-in">
+          <div className={`rounded-[3rem] border shadow-sm overflow-hidden animate-in fade-in ${ darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}>
             {/* Filtros */}
-            <div className="p-8 border-b space-y-4">
+            <div className={`p-8 border-b space-y-4 ${ darkMode ? 'border-slate-700' : ''}`}>
               <div className="relative flex-1 group">
                 <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#FBBE01] transition-colors" size={20} />
                 <input
@@ -953,20 +1023,20 @@ export default function AdminPage() {
         )}
 
         {tab === 'products' && (
-          <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden animate-in slide-in-from-bottom-4">
-            <div className="p-8 border-b flex items-center gap-6">
+          <div className={`rounded-[3rem] border shadow-sm overflow-hidden animate-in slide-in-from-bottom-4 ${ darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}>
+            <div className={`p-8 border-b flex items-center gap-6 ${ darkMode ? 'border-slate-700' : ''}`}>
               <div className="relative flex-1 group">
                 <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#FBBE01] transition-colors" size={20} />
-                <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Procurar no estoque..." className="w-full pl-16 p-5 bg-slate-50 rounded-[2rem] border-none text-sm font-bold outline-none focus:ring-2 ring-black transition-all" />
+                <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Procurar no estoque..." className={`w-full pl-16 p-5 rounded-[2rem] border-none text-sm font-bold outline-none focus:ring-2 ring-black transition-all ${ darkMode ? 'bg-slate-700 text-white placeholder-slate-400' : 'bg-slate-50'}`} />
               </div>
             </div>
 
             {selectedProducts.length > 0 && (
-              <div className="px-8 py-4 border-b bg-slate-50 flex items-center justify-between">
-                <div className="font-black text-sm">{selectedProducts.length} selecionado(s)</div>
+              <div className={`px-8 py-4 border-b flex items-center justify-between ${ darkMode ? 'bg-slate-700 border-slate-700' : 'bg-slate-50'}`}>
+                <div className={`font-black text-sm ${ darkMode ? 'text-white' : ''}`}>{selectedProducts.length} selecionado(s)</div>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setSelectedProducts([])} className="py-2 px-4 bg-slate-100 rounded-2xl font-bold text-sm">Limpar</button>
-                  <button onClick={() => setConfirmBulkDelete(true)} className="py-2 px-4 bg-red-600 text-white rounded-2xl font-bold text-sm">Excluir Selecionados</button>
+                  <button onClick={() => setSelectedProducts([])} className={`py-2 px-4 rounded-2xl font-bold text-sm ${ darkMode ? 'bg-slate-600 text-white hover:bg-slate-500' : 'bg-slate-100 hover:bg-slate-200'}`}>Limpar</button>
+                  <button onClick={() => setConfirmBulkDelete(true)} className="py-2 px-4 bg-red-600 text-white rounded-2xl font-bold text-sm hover:bg-red-700">Excluir Selecionados</button>
                 </div>
               </div>
             )}
@@ -992,12 +1062,12 @@ export default function AdminPage() {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {filteredProducts.map(p => (
-                  <tr key={p.id} className="hover:bg-slate-50 transition-all group cursor-pointer" onClick={() => setViewingProduct(p)}>
+                  <tr key={p.id} className={`transition-all group cursor-pointer ${ darkMode ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50'}`} onClick={() => setViewingProduct(p)}>
                     <td className="px-6 py-6" onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={selectedProducts.includes(p.id)} onChange={() => toggleSelectProduct(p.id)} />
                     </td>
-                    <td className="px-8 py-6 flex items-center gap-4"><img src={p.image_url} className="w-12 h-12 rounded-2xl object-cover border" alt="" /><span className="font-black text-sm tracking-tight">{p.name}</span></td>
-                    <td className="px-8 py-6 text-center font-black text-black">{formatCurrency(p.price)}</td>
+                    <td className="px-8 py-6 flex items-center gap-4"><img src={p.image_url} className="w-12 h-12 rounded-2xl object-cover border" alt="" /><span className={`font-black text-sm tracking-tight ${ darkMode ? 'text-white' : ''}`}>{p.name}</span></td>
+                    <td className={`px-8 py-6 text-center font-black ${ darkMode ? 'text-white' : 'text-black'}`}>{formatCurrency(p.price)}</td>
                     <td className="px-8 py-6 text-center"><span className={`px-4 py-2 rounded-2xl text-[10px] font-black ${p.stock_quantity <= p.min_stock ? 'bg-red-50 text-red-600 shadow-sm' : 'bg-slate-100 text-slate-600'}`}>{p.stock_quantity} un</span></td>
                     <td className="px-8 py-6 text-right pr-8 flex justify-end gap-3">
                       <button onClick={(e) => { e.stopPropagation(); setEditingItem(p); setIsModalOpen(true); }} className="p-3 bg-white shadow-sm border rounded-xl text-slate-400 hover:text-black transition-all"><Edit3 size={18} /></button>
@@ -1011,20 +1081,20 @@ export default function AdminPage() {
         )}
 
         {tab === 'categories' && (
-          <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden animate-in fade-in">
-            <div className="p-8 border-b flex items-center gap-6">
+          <div className={`rounded-[3rem] border shadow-sm overflow-hidden animate-in fade-in ${ darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}>
+            <div className={`p-8 border-b flex items-center gap-6 ${ darkMode ? 'border-slate-700' : ''}`}>
               <div className="relative flex-1 group">
-                <input value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Procurar categoria..." className="w-full pl-4 p-4 bg-slate-50 rounded-[2rem] border-none text-sm font-bold outline-none focus:ring-2 ring-black transition-all" />
+                <input value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Procurar categoria..." className={`w-full pl-4 p-4 rounded-[2rem] border-none text-sm font-bold outline-none focus:ring-2 ring-black transition-all ${ darkMode ? 'bg-slate-700 text-white placeholder-slate-400' : 'bg-slate-50'}`} />
               </div>
             </div>
             <table className="w-full text-left">
-              <thead className="bg-slate-50/30 text-[10px] font-black text-slate-400 uppercase tracking-widest px-8">
+              <thead className={`text-[10px] font-black text-slate-400 uppercase tracking-widest px-8 ${ darkMode ? 'bg-slate-700/50' : 'bg-slate-50/30'}`}>
                 <tr><th className="px-8 py-6">Categoria</th><th className="px-8 py-6 text-right pr-12">Ações</th></tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className={`divide-y ${ darkMode ? 'divide-slate-700' : 'divide-slate-50'}`}>
                 {categories.map(c => (
-                  <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-8 py-6 font-black text-sm">{c.name}</td>
+                  <tr key={c.id} className={`transition-colors ${ darkMode ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50/50'}`}>
+                    <td className={`px-8 py-6 font-black text-sm ${ darkMode ? 'text-white' : ''}`}>{c.name}</td>
                     <td className="px-8 py-6 text-right pr-8 flex justify-end gap-3">
                       <button onClick={() => { setEditingItem(c); setFormData({ name: c.name }); setIsModalOpen(true); }} className="p-3 text-slate-400 hover:text-black transition-all"><Edit3 size={18} /></button>
                       <button onClick={() => setConfirmDelete({ table: 'categories', id: c.id, show: true })} className="p-3 text-slate-400 hover:text-red-500 transition-all"><Trash2 size={18} /></button>
@@ -1037,15 +1107,15 @@ export default function AdminPage() {
         )}
 
         {tab === 'fees' && (
-          <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden animate-in fade-in">
+          <div className={`rounded-[3rem] border shadow-sm overflow-hidden animate-in fade-in ${ darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}>
             <table className="w-full text-left">
               <thead className="bg-slate-50/30 text-[10px] font-black text-slate-400 uppercase tracking-widest px-8">
                 <tr><th className="px-8 py-6">Bairro</th><th className="px-8 py-6 text-center">Taxa de Entrega</th><th className="px-8 py-6 text-right pr-12">Ações</th></tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className={`divide-y ${ darkMode ? 'divide-slate-700' : 'divide-slate-50'}`}>
                 {neighborhoods.map(n => (
-                  <tr key={n.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-8 py-6 font-black text-sm">{n.name}</td>
+                  <tr key={n.id} className={`transition-colors ${ darkMode ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50/50'}`}>
+                    <td className={`px-8 py-6 font-black text-sm ${ darkMode ? 'text-white' : ''}`}>{n.name}</td>
                     <td className="px-8 py-6 text-center font-black text-lg text-[#FBBE01]">{formatCurrency(n.fee)}</td>
                     <td className="px-8 py-6 text-right pr-8 flex justify-end gap-3">
                       <button onClick={() => { setEditingItem(n); setFormData({ name: n.name, fee: n.fee }); setIsModalOpen(true); }} className="p-3 text-slate-400 hover:text-black transition-all"><Edit3 size={18} /></button>
@@ -1060,10 +1130,35 @@ export default function AdminPage() {
 
         {tab === 'promotions' && (
           <div className="space-y-10 animate-in fade-in">
+            {/* Coupon Performance */}
+            {couponPerformance.length > 0 && (
+              <div className={`p-8 rounded-[3rem] border ${ darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}>
+                <div className="flex items-center gap-3 mb-6">
+                  <Zap className="fill-amber-500 text-amber-500" size={24} />
+                  <h3 className="font-black text-lg uppercase tracking-tight">Performance de Cupons</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {couponPerformance.slice(0, 4).map(coupon => (
+                    <div key={coupon.id} className={`p-6 rounded-2xl border-l-4 border-amber-500 ${ darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-100'}`}>
+                      <div className="flex justify-between items-start mb-4">
+                        <p className="font-black text-sm uppercase tracking-widest text-amber-600">{coupon.code}</p>
+                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${ coupon.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {coupon.isActive ? 'Ativo' : 'Expirado'}
+                        </span>
+                      </div>
+                      <p className="text-2xl font-black text-black mb-1">{coupon.usages}</p>
+                      <p className={`text-[10px] font-bold italic ${ darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Utilizações</p>
+                      {coupon === bestCoupon && <p className="text-[9px] text-amber-600 font-black mt-3 italic">⭐ Mais popular</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* IA Suggestions */}
-            <div className="bg-amber-50/50 p-8 rounded-[3.5rem] border border-amber-100">
+            <div className={`p-8 rounded-[3.5rem] border ${ darkMode ? 'bg-slate-800 border-slate-700' : 'bg-amber-50/50 border-amber-100'}`}>
               <div className="flex justify-between items-center mb-6">
-                <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-2 text-amber-900 italic"><Zap size={18} className="fill-amber-500" /> Inteligência Help Gela</h3>
+                <h3 className={`font-black text-sm uppercase tracking-widest flex items-center gap-2 italic ${ darkMode ? 'text-amber-300' : 'text-amber-900'}`}><Zap size={18} className="fill-amber-500" /> Inteligência Help Gela</h3>
                 <div className="flex gap-2">
                   <button onClick={() => scrollSuggestions('left')} className="p-2 bg-white rounded-full text-amber-900 shadow-sm"><ChevronLeft size={20} /></button>
                   <button onClick={() => scrollSuggestions('right')} className="p-2 bg-white rounded-full text-amber-900 shadow-sm"><ChevronRight size={20} /></button>
