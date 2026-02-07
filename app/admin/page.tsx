@@ -40,6 +40,7 @@ export default function AdminPage() {
   const [salesSearch, setSalesSearch] = useState('');
   const debouncedSalesSearch = useDebounce(salesSearch, 300);
   const [salesPaymentFilter, setSalesPaymentFilter] = useState<'all' | 'pix' | 'cash' | 'card'>('all');
+  const [salesStatusFilter, setSalesStatusFilter] = useState<'all' | 'pending' | 'out_for_delivery' | 'delivered' | 'cancelled'>('all');
   const [salesPage, setSalesPage] = useState(1);
   const [paginatedSales, setPaginatedSales] = useState<any[]>([]);
   const [salesCount, setSalesCount] = useState(0);
@@ -49,6 +50,8 @@ export default function AdminPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [viewingOrder, setViewingOrder] = useState<any>(null);
+  const [orderStatusUpdating, setOrderStatusUpdating] = useState(false);
+  const [selectedOrderStatus, setSelectedOrderStatus] = useState<string | null>(null);
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
   const [viewingCoupon, setViewingCoupon] = useState<any>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ show: boolean, table: string, id: string } | null>(null);
@@ -299,6 +302,11 @@ export default function AdminPage() {
     setSuggestions(finalList);
   };
 
+  // keep selectedOrderStatus in sync when modal opens
+  useEffect(() => {
+    setSelectedOrderStatus(viewingOrder?.status ?? null);
+  }, [viewingOrder]);
+
   const scrollSuggestions = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
       const { scrollLeft, clientWidth } = scrollRef.current;
@@ -349,7 +357,7 @@ export default function AdminPage() {
     // reset página quando filtros mudarem
     setSalesPage(1);
     fetchOrdersPage(1);
-  }, [debouncedSalesSearch, salesPaymentFilter]);
+  }, [debouncedSalesSearch, salesPaymentFilter, salesStatusFilter]);
 
   const salesPageItems = useMemo(() => {
     return paginatedSales;
@@ -374,6 +382,11 @@ export default function AdminPage() {
       // payment filter
       const cond = paymentFilterToCondition(salesPaymentFilter);
       if (cond) query = query.filter(cond.column, cond.op, cond.value);
+
+      // status filter
+      if (salesStatusFilter && salesStatusFilter !== 'all') {
+        query = query.eq('status', salesStatusFilter);
+      }
 
       // search across some fields using or
       if (q) {
@@ -499,6 +512,41 @@ export default function AdminPage() {
     } finally {
       setConfirmBulkDelete(false);
       stopLoading();
+    }
+  };
+
+  const updateOrderStatus = async () => {
+    if (!viewingOrder || !selectedOrderStatus) return;
+    const previousStatus = viewingOrder.status;
+    try {
+      setOrderStatusUpdating(true);
+
+      // Optimistic UI: update local lists and viewing item
+      setOrders((s) => s.map((o) => (o.id === viewingOrder.id ? { ...o, status: selectedOrderStatus } : o)));
+      setPaginatedSales((s) => s.map((o) => (o.id === viewingOrder.id ? { ...o, status: selectedOrderStatus } : o)));
+      setViewingOrder((v: any) => (v ? { ...v, status: selectedOrderStatus } : v));
+
+      const { error } = await supabase.from('orders').update({ status: selectedOrderStatus }).eq('id', viewingOrder.id);
+      if (error) throw error;
+
+      // Audit log (non-blocking)
+      try {
+        await logAudit('update_order_status', 'orders', viewingOrder.id, { from: previousStatus, to: selectedOrderStatus });
+      } catch (e) {}
+
+      showToast('Status do pedido atualizado!');
+      setViewingOrder(null);
+      // refresh current page to ensure consistency
+      fetchOrdersPage(salesPage);
+    } catch (e) {
+      console.error(e);
+      // revert optimistic changes
+      setOrders((s) => s.map((o) => (o.id === viewingOrder.id ? { ...o, status: previousStatus } : o)));
+      setPaginatedSales((s) => s.map((o) => (o.id === viewingOrder.id ? { ...o, status: previousStatus } : o)));
+      setViewingOrder((v: any) => (v ? { ...v, status: previousStatus } : v));
+      showToast('Erro ao atualizar status', 'error');
+    } finally {
+      setOrderStatusUpdating(false);
     }
   };
 
@@ -714,6 +762,20 @@ export default function AdminPage() {
                   <option value="card">Cartão</option>
                   <option value="cash">Dinheiro</option>
                 </select>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 text-slate-400 font-black text-[10px] uppercase tracking-widest">Status</div>
+                  <select
+                    value={salesStatusFilter}
+                    onChange={(e) => setSalesStatusFilter(e.target.value as any)}
+                    className="p-4 bg-slate-50 rounded-[1.5rem] border-none font-black text-xs outline-none"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="pending">Pendente</option>
+                    <option value="out_for_delivery">A caminho</option>
+                    <option value="delivered">Entregue</option>
+                    <option value="cancelled">Cancelado</option>
+                  </select>
+                </div>
                 <button onClick={exportSalesCSV} className="ml-2 p-3 bg-slate-50 rounded-xl text-slate-600 text-xs font-black hover:bg-slate-100">Exportar CSV</button>
               </div>
             </div>
@@ -964,20 +1026,20 @@ export default function AdminPage() {
                 <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2 italic">Total de Faturamento</p>
                 <h3 className="text-3xl font-black">{formatCurrency(abcAnalysis.total)}</h3>
               </div>
-              <div className="bg-red-50 p-8 rounded-[2.5rem] border border-red-100 shadow-sm">
-                <p className="text-red-600 text-[10px] font-black uppercase tracking-widest mb-2 italic">Classe A</p>
-                <h3 className="text-3xl font-black text-red-600">{abcAnalysis.countA}</h3>
-                <p className="text-[10px] font-bold text-red-400 mt-2">~80% do faturamento</p>
+              <div className="bg-green-50 p-8 rounded-[2.5rem] border border-green-100 shadow-sm">
+                <p className="text-green-600 text-[10px] font-black uppercase tracking-widest mb-2 italic">Classe A</p>
+                <h3 className="text-3xl font-black text-green-600">{abcAnalysis.countA}</h3>
+                <p className="text-[10px] font-bold text-green-400 mt-2">~80% do faturamento</p>
               </div>
               <div className="bg-yellow-50 p-8 rounded-[2.5rem] border border-yellow-100 shadow-sm">
                 <p className="text-yellow-600 text-[10px] font-black uppercase tracking-widest mb-2 italic">Classe B</p>
                 <h3 className="text-3xl font-black text-yellow-600">{abcAnalysis.countB}</h3>
                 <p className="text-[10px] font-bold text-yellow-400 mt-2">~15% do faturamento</p>
               </div>
-              <div className="bg-green-50 p-8 rounded-[2.5rem] border border-green-100 shadow-sm">
-                <p className="text-green-600 text-[10px] font-black uppercase tracking-widest mb-2 italic">Classe C</p>
-                <h3 className="text-3xl font-black text-green-600">{abcAnalysis.countC}</h3>
-                <p className="text-[10px] font-bold text-green-400 mt-2">~5% do faturamento</p>
+              <div className="bg-red-50 p-8 rounded-[2.5rem] border border-red-100 shadow-sm">
+                <p className="text-red-600 text-[10px] font-black uppercase tracking-widest mb-2 italic">Classe C</p>
+                <h3 className="text-3xl font-black text-red-600">{abcAnalysis.countC}</h3>
+                <p className="text-[10px] font-bold text-red-400 mt-2">~5% do faturamento</p>
               </div>
             </div>
 
@@ -1022,11 +1084,11 @@ export default function AdminPage() {
                       <td className="px-8 py-6 text-center">
                         <span
                           className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                            item.classification === 'A'
-                              ? 'bg-red-100 text-red-600'
-                              : item.classification === 'B'
-                              ? 'bg-yellow-100 text-yellow-600'
-                              : 'bg-green-100 text-green-600'
+                              item.classification === 'A'
+                                ? 'bg-green-100 text-green-600'
+                                : item.classification === 'B'
+                                ? 'bg-yellow-100 text-yellow-600'
+                                : 'bg-red-100 text-red-600'
                           }`}
                         >
                           {item.classification}
@@ -1043,7 +1105,7 @@ export default function AdminPage() {
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Legenda da Curva ABC</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
-                  <p className="font-black text-red-600 mb-2">Classe A - Produtos Estratégicos</p>
+                  <p className="font-black text-green-600 mb-2">Classe A - Produtos Estratégicos</p>
                   <p className="text-[10px] text-slate-600 font-semibold">Representa aproximadamente 80% do faturamento. Recomenda-se manter sempre em estoque e acompanhar de perto.</p>
                 </div>
                 <div>
@@ -1051,7 +1113,7 @@ export default function AdminPage() {
                   <p className="text-[10px] text-slate-600 font-semibold">Representa aproximadamente 15% do faturamento. Controle moderado de estoque é necessário.</p>
                 </div>
                 <div>
-                  <p className="font-black text-green-600 mb-2">Classe C - Produtos com Baixa Venda</p>
+                  <p className="font-black text-red-600 mb-2">Classe C - Produtos com Baixa Venda</p>
                   <p className="text-[10px] text-slate-600 font-semibold">Representa aproximadamente 5% do faturamento. Considerar promoções ou remover do catálogo.</p>
                 </div>
               </div>
@@ -1120,7 +1182,35 @@ export default function AdminPage() {
                   <p className="text-[10px] font-black text-[#FBBE01] uppercase tracking-widest mb-1 italic">Cupom: {viewingOrder.applied_coupon || 'Nenhum'}</p>
                   <h2 className="text-3xl font-black tracking-tighter italic uppercase">{viewingOrder.customer_name}</h2>
                 </div>
-                <div className="text-right font-bold text-xs"><p className="text-slate-400 italic">{new Date(viewingOrder.created_at).toLocaleString()}</p><p className="uppercase">{viewingOrder.payment_method}</p></div>
+                <div className="text-right font-bold text-xs">
+                  <p className="text-slate-400 italic">{new Date(viewingOrder.created_at).toLocaleString()}</p>
+                  <p className="uppercase">{viewingOrder.payment_method}</p>
+                  <p className="mt-2">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                      viewingOrder.status === 'delivered' ? 'bg-green-100 text-green-600' : viewingOrder.status === 'out_for_delivery' ? 'bg-yellow-100 text-yellow-600' : viewingOrder.status === 'cancelled' ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {String(viewingOrder.status).replace(/_/g, ' ')}
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status do pedido</p>
+                  <select value={selectedOrderStatus || ''} onChange={(e) => setSelectedOrderStatus(e.target.value)} className="p-3 rounded-2xl bg-slate-50 font-black">
+                    <option value="pending">Pendente</option>
+                    <option value="preparing">Preparando</option>
+                    <option value="out_for_delivery">Saiu para entrega</option>
+                    <option value="delivered">Entregue</option>
+                    <option value="cancelled">Cancelado</option>
+                  </select>
+                </div>
+                <div>
+                  <button onClick={updateOrderStatus} disabled={orderStatusUpdating || selectedOrderStatus === viewingOrder.status} className={`py-3 px-4 rounded-2xl font-black ${orderStatusUpdating ? 'bg-slate-200' : 'bg-black text-white hover:bg-[#FBBE01] hover:text-black'}`}>
+                    {orderStatusUpdating ? 'Atualizando...' : 'Salvar status'}
+                  </button>
+                </div>
               </div>
               <div className="space-y-3 max-h-[300px] overflow-y-auto no-scrollbar">
                 {viewingOrder.items?.map((item: any, idx: number) => (
