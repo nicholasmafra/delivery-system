@@ -26,7 +26,7 @@ interface AISuggestion extends Partial<Product> {
 }
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<'metrics' | 'products' | 'fees' | 'promotions' | 'sales' | 'categories' | 'abc'>('metrics');
+  const [tab, setTab] = useState<'metrics' | 'products' | 'fees' | 'promotions' | 'sales' | 'categories' | 'abc' | 'customers'>('metrics');
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [neighborhoods, setNeighborhoods] = useState<Neighborhood[]>([]);
@@ -314,10 +314,10 @@ export default function AdminPage() {
   const fetchAuditLogs = async (orderId: string) => {
     try {
       setAuditLoading(true);
-      const { data, error } = await supabase.from('admin_audit').select('*').eq('table', 'orders').eq('record_id', orderId).order('created_at', { ascending: false }).limit(50);
+      const { data, error } = await supabase.from('admin_audit').select('*').eq('"table"', 'orders').eq('record_id', orderId).order('created_at', { ascending: false }).limit(50);
       if (!error && data) setAuditLogs(data);
     } catch (e) {
-      // ignore
+      console.warn('Audit logs failed:', e);
     } finally {
       setAuditLoading(false);
     }
@@ -640,6 +640,24 @@ export default function AdminPage() {
     };
   }, [products, orders]);
 
+  // Top Customers: calcula faturamento e pedidos por cliente
+  const topCustomers = useMemo(() => {
+    const customerMap: Record<string, { name: string; total: number; count: number }> = {};
+
+    orders.forEach((o) => {
+      const key = String(o.customer_name || 'Unknown');
+      if (!customerMap[key]) {
+        customerMap[key] = { name: key, total: 0, count: 0 };
+      }
+      customerMap[key].total += Number(o.total_amount || 0);
+      customerMap[key].count += 1;
+    });
+
+    return Object.values(customerMap)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 50);
+  }, [orders]);
+
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex font-sans antialiased text-slate-900">
       {/* Toasts rendered by ToastProvider */}
@@ -659,6 +677,7 @@ export default function AdminPage() {
             { id: 'promotions', icon: Ticket, label: 'Promoções' },
             { id: 'sales', icon: BarChart3, label: 'Vendas' },
             { id: 'abc', icon: TrendingUp, label: 'Curva ABC' },
+            { id: 'customers', icon: User, label: 'Clientes' },
           ].map((nav) => (
             <button key={nav.id} onClick={() => setTab(nav.id as any)} className={`w-full flex items-center gap-3 p-3 rounded-2xl font-bold transition-all ${tab === nav.id ? 'bg-black text-white shadow-xl translate-x-1' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'}`}>
               <nav.icon size={20} className={tab === nav.id ? 'text-[#FBBE01]' : ''} />
@@ -671,10 +690,10 @@ export default function AdminPage() {
       <main className="flex-1 p-4 lg:p-10 max-w-7xl mx-auto w-full overflow-x-hidden">
         <header className="flex justify-between items-center mb-10">
           <div>
-            <h1 className="text-4xl font-black tracking-tighter capitalize">{tab === 'fees' ? 'Entregas' : tab === 'abc' ? 'Curva ABC' : tab}</h1>
+            <h1 className="text-4xl font-black tracking-tighter capitalize">{tab === 'fees' ? 'Entregas' : tab === 'abc' ? 'Curva ABC' : tab === 'customers' ? 'Top Clientes' : tab}</h1>
             <p className="text-slate-400 text-sm font-semibold italic">Gestão Administrativa</p>
           </div>
-          {tab !== 'metrics' && tab !== 'sales' && tab !== 'abc' && (
+          {tab !== 'metrics' && tab !== 'sales' && tab !== 'abc' && tab !== 'customers' && (
             <button onClick={() => { setEditingItem(null); setFormData({ type: 'percent' }); setIsModalOpen(true); }} className="bg-black text-white px-8 py-4 rounded-3xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-[#FBBE01] hover:text-black transition-all shadow-2xl active:scale-95">
               <Plus size={18} /> <span>Novo {tab === 'products' ? 'Produto' : tab === 'fees' ? 'Bairro' : tab === 'promotions' ? 'Cupom' : tab === 'categories' ? 'Categoria' : 'Registro'}</span>
             </button>
@@ -1137,6 +1156,52 @@ export default function AdminPage() {
           </div>
         )}
 
+        {tab === 'customers' && (
+          <div className="space-y-8 animate-in fade-in">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4 italic">Total de Clientes</p>
+                <h3 className="text-4xl font-black">{topCustomers.length}</h3>
+              </div>
+              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4 italic">Ticket M\u00e9dio</p>
+                <h3 className="text-4xl font-black">{formatCurrency(topCustomers.length > 0 ? topCustomers.reduce((acc, c) => acc + c.total, 0) / topCustomers.length : 0)}</h3>
+              </div>
+              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4 italic">Top Cliente</p>
+                <h3 className="text-4xl font-black">{formatCurrency(topCustomers[0]?.total || 0)}</h3>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden">
+              <table className="w-full text-left">
+                <thead className="bg-slate-50/30 text-[10px] font-black text-slate-400 uppercase tracking-widest px-8">
+                  <tr>
+                    <th className="px-8 py-6">#</th>
+                    <th className="px-8 py-6">Cliente</th>
+                    <th className="px-8 py-6 text-center">N\u00ba de Pedidos</th>
+                    <th className="px-8 py-6 text-right">Total Gasto</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {topCustomers.map((customer, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-8 py-6">
+                        <span className="inline-flex items-center justify-center w-8 h-8 bg-black text-white text-xs font-black rounded-full">{idx + 1}</span>
+                      </td>
+                      <td className="px-8 py-6 font-black text-sm">{customer.name}</td>
+                      <td className="px-8 py-6 text-center">
+                        <span className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black">{customer.count}</span>
+                      </td>
+                      <td className="px-8 py-6 text-right font-black text-lg text-[#FBBE01]">{formatCurrency(customer.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* MODAL: CONFIRMAR DELEÇÃO CUSTOMIZADO */}
         {confirmDelete?.show && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
@@ -1212,20 +1277,10 @@ export default function AdminPage() {
               </div>
 
               <div className="flex items-center gap-4">
-                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status do pedido</p>
-                  <select value={selectedOrderStatus || ''} onChange={(e) => setSelectedOrderStatus(e.target.value)} className="p-3 rounded-2xl bg-slate-50 font-black">
-                    <option value="pending">Pendente</option>
-                    <option value="preparing">Preparando</option>
-                    <option value="out_for_delivery">Saiu para entrega</option>
-                    <option value="delivered">Entregue</option>
-                    <option value="cancelled">Cancelado</option>
-                  </select>
-                </div>
-                <div>
-                  <button onClick={updateOrderStatus} disabled={orderStatusUpdating || selectedOrderStatus === viewingOrder.status} className={`py-3 px-4 rounded-2xl font-black ${orderStatusUpdating ? 'bg-slate-200' : 'bg-black text-white hover:bg-[#FBBE01] hover:text-black'}`}>
-                    {orderStatusUpdating ? 'Atualizando...' : 'Salvar status'}
-                  </button>
+                <div className="flex-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status do pedido (n8n)</p>
+                  <p className="text-sm font-black px-3 py-2 rounded-2xl bg-slate-100 text-slate-600 uppercase">{String(viewingOrder.status).replace(/_/g, ' ')}</p>
+                  <p className="text-[9px] text-slate-400 mt-2 italic">✓ Atualizado automaticamente via n8n</p>
                 </div>
               </div>
               <div className="space-y-3 max-h-[300px] overflow-y-auto no-scrollbar">
@@ -1260,7 +1315,7 @@ export default function AdminPage() {
               <div className="bg-black text-white p-8 rounded-[2.5rem] shadow-xl space-y-3">
                 <div className="flex justify-between text-[10px] font-black uppercase text-slate-400 tracking-widest"><span>Subtotal</span><span>{formatCurrency(viewingOrder.subtotal)}</span></div>
                 <div className="flex justify-between text-[10px] font-black uppercase text-slate-400 tracking-widest"><span>Entrega</span><span>{formatCurrency(viewingOrder.delivery_fee)}</span></div>
-                {viewingOrder.discount > 0 && <div className="flex justify-between text-[10px] font-black uppercase text-green-400 tracking-widest"><span>Desconto ({viewingOrder.applied_coupon})</span><span>-{formatCurrency(viewingOrder.discount)}</span></div>}
+                {viewingOrder.discount > 0 && <div className="flex justify-between text-[10px] font-black uppercase text-green-400 tracking-widest"><span>Desconto 🎟️ {viewingOrder.applied_coupon || 'Cupom'}</span><span>-{formatCurrency(viewingOrder.discount)}</span></div>}
                 <div className="flex justify-between items-end pt-4 border-t border-white/10"><p className="text-xs font-black text-[#FBBE01] uppercase italic tracking-widest">Total do Pedido</p><p className="text-4xl font-black tracking-tighter italic">{formatCurrency(viewingOrder.total_amount)}</p></div>
               </div>
             </div>
